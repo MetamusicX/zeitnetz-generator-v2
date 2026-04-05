@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeitnetz Generator v2</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --accent: #e94560;
+    --accent2: #533483;
+    --accent3: #0891b2;
+    --text: #eee;
+    --text2: #aab;
+    --input-bg: #0d1b3e;
+    --border: #2a3a5e;
+    --success: #4ade80;
+    --mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .container {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 30px 24px;
+  }
+  header {
+    margin-bottom: 32px;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 16px;
+  }
+  header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  header .subtitle { color: var(--accent3); margin-top: 2px; font-size: 13px; font-weight: 600; letter-spacing: 0.5px; }
+  header p { color: var(--text2); margin-top: 4px; font-size: 14px; }
+  header a { color: var(--accent); text-decoration: none; }
+  header a:hover { text-decoration: underline; }
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 18px;
+  }
+  .section h2 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 5px;
+  }
+  .field .hint {
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 3px;
+  }
+  .field input[type="text"], .field input[type="number"] {
+    width: 100%;
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 15px;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field input:disabled { opacity: 0.4; }
+  .radio-group { display: flex; flex-direction: column; gap: 8px; }
+  .radio-group label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 400; cursor: pointer;
+  }
+  .radio-group input[type="radio"] { accent-color: var(--accent); }
+  .ts-custom-row { display: flex; align-items: center; gap: 8px; }
+  .ts-custom-row input[type="text"] { flex: 1; }
+  .buttons { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  button {
+    padding: 11px 22px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  button:active { transform: scale(0.97); }
+  .btn-generate { background: var(--accent); color: white; }
+  .btn-generate:hover { background: #d63a52; }
+  .btn-validate { background: var(--accent2); color: white; }
+  .btn-validate:hover { background: #6b44a8; }
+  .btn-discover { background: var(--surface2); color: white; border: 1px solid var(--border); }
+  .btn-discover:hover { background: #1a4a7a; }
+  .btn-discover-fam { background: var(--accent3); color: white; }
+  .btn-discover-fam:hover { background: #0e7490; }
+  .btn-reset { margin-left: auto; background: transparent; color: var(--text2); border: 1px solid var(--border); }
+  .btn-reset:hover { color: var(--text); border-color: var(--text2); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .log-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .log-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .log-header h2 {
+    font-size: 14px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--accent); margin: 0;
+  }
+  .status {
+    font-size: 12px; padding: 3px 10px; border-radius: 20px; font-weight: 600;
+  }
+  .status-idle { background: var(--border); color: var(--text2); }
+  .status-loading { background: #1e3a5f; color: #60a5fa; }
+  .status-running { background: #854d0e; color: #fbbf24; animation: pulse 1.5s infinite; }
+  .status-done { background: #14532d; color: var(--success); }
+  .status-error { background: #7f1d1d; color: #fca5a5; }
+  #log {
+    padding: 16px 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    min-height: 200px;
+    max-height: 450px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: #c8d0e0;
+    background: #0a0f1e;
+  }
+
+  /* Download links */
+  .downloads {
+    margin-top: 18px;
+    display: none;
+  }
+  .downloads.visible { display: block; }
+  .downloads h2 {
+    font-size: 14px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--success); margin-bottom: 12px;
+  }
+  .download-link {
+    display: inline-block;
+    padding: 8px 16px;
+    margin: 4px 8px 4px 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+    font-family: var(--mono);
+    transition: all 0.15s;
+  }
+  .download-link:hover {
+    background: #1a4a7a;
+    border-color: var(--success);
+  }
+
+  /* Discover dialogs (shared styles) */
+  .discover-overlay {
+    display: none; position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    justify-content: center; align-items: center; z-index: 100;
+  }
+  .discover-overlay.active { display: flex; }
+  .discover-dialog {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px; width: 400px;
+  }
+  .discover-dialog h3 { margin-bottom: 16px; color: var(--accent); }
+  .discover-dialog.fam-dialog h3 { color: var(--accent3); }
+  .discover-dialog .field { margin-bottom: 12px; }
+  .discover-dialog .dialog-buttons {
+    display: flex; gap: 10px; margin-top: 18px; justify-content: flex-end;
+  }
+
+  /* Use buttons in results */
+  .result-use-btn {
+    padding: 4px 12px;
+    background: var(--accent3);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-left: 8px;
+  }
+  .result-use-btn:hover { background: #0e7490; }
+
+  /* Loading overlay */
+  .loading-overlay {
+    display: none; position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(26, 26, 46, 0.95);
+    justify-content: center; align-items: center; z-index: 200;
+    flex-direction: column; gap: 16px;
+  }
+  .loading-overlay.active { display: flex; }
+  .loading-spinner {
+    width: 48px; height: 48px;
+    border: 4px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .loading-text { color: var(--text2); font-size: 14px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  .footer {
+    margin-top: 32px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--text2);
+    text-align: center;
+  }
+  .footer a { color: var(--accent); text-decoration: none; }
+
+  /* Custom TS types section styling */
+  .ts-types-section {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .ts-types-section h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--accent3);
+    margin-bottom: 10px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading overlay (shown while Pyodide loads) -->
+<div class="loading-overlay active" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">Loading Python runtime...</div>
+</div>
+
+<div class="container">
+  <header>
+    <h1>Zeitnetz Generator v2</h1>
+    <div class="subtitle">Extended Edition &mdash; Custom families and time signatures</div>
+    <p>Algorithmic time-grid generator for music composition &mdash;
+       <a href="https://github.com/MetamusicX/zeitnetz-generator" target="_blank">GitHub</a></p>
+  </header>
+
+  <!-- Input Parameters -->
+  <div class="section">
+    <h2>Input Parameters</h2>
+    <div class="field">
+      <label>Pitch Row (12 values)</label>
+      <input type="text" id="pitches" value="1 11 0 8 9 3 6 4 2 10 5 7">
+      <div class="hint">Integers 0-11 or German names: c cis d dis e f fis g gis a ais h</div>
+    </div>
+    <div class="field">
+      <label>Permutation (12 values)</label>
+      <input type="text" id="perm" value="1 5 0 6 2 7 11 8 3 10 4 9">
+      <div class="hint">A permutation of 0-11</div>
+    </div>
+    <div class="field">
+      <label>Durations (13 values)</label>
+      <input type="text" id="durations" value="-11 6 9 7 6 6 4 3 10 6 3 1 10">
+      <div class="hint">First value may be negative (initial rest)</div>
+    </div>
+  </div>
+
+  <!-- Time Signatures -->
+  <div class="section">
+    <h2>Time Signatures</h2>
+
+    <!-- TS Types subsection -->
+    <div class="ts-types-section" style="margin-top:0; padding-top:0; border-top:none;">
+      <h3>Time Signature Types</h3>
+      <div class="radio-group">
+        <label>
+          <input type="radio" name="ts_types_mode" value="default" checked
+                 onchange="toggleCustomTSTypes()">
+          Default (Lachenmann 7 types: 3/8, 4/8, 3/4, 4/4, 3/2, 4/2, 12/4)
+        </label>
+        <label>
+          <input type="radio" name="ts_types_mode" value="custom"
+                 onchange="toggleCustomTSTypes()">
+          Custom types:
+        </label>
+      </div>
+      <div class="field" style="margin-top:8px;">
+        <input type="text" id="ts_types_custom" value="3/8, 5/8, 7/8, 3/4, 4/4, 12/4"
+               disabled placeholder="e.g. 3/8, 5/8, 7/8, 3/4, 4/4, 12/4">
+        <div class="hint">Each type maps 12 grid positions per bar. Types are numbered 1, 2, 3... in the order listed.</div>
+      </div>
+    </div>
+
+    <!-- TS Sequence subsection -->
+    <div class="ts-types-section">
+      <h3>Time Signature Sequence</h3>
+      <div class="radio-group">
+        <label>
+          <input type="radio" name="ts_mode" value="default" checked
+                 onchange="toggleCustomTS()">
+          Default (Mouvement wedge pattern, 105 bars cyclic)
+        </label>
+        <label>
+          <input type="radio" name="ts_mode" value="auto"
+                 onchange="toggleCustomTS()">
+          Auto-generate based on piece length
+        </label>
+        <label class="ts-custom-row">
+          <input type="radio" name="ts_mode" value="custom"
+                 onchange="toggleCustomTS()">
+          Custom sequence:
+          <input type="text" id="ts_custom" value="7 6 5 4 3 2 1 1 2 3 4 5 6 7"
+                 disabled placeholder="type indices (e.g. 1-7)">
+        </label>
+      </div>
+      <div class="hint" style="margin-top:6px;">When using custom types, sequence values refer to your custom type indices (1, 2, 3...).</div>
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="buttons">
+    <button class="btn-generate" onclick="runGenerate()" id="btnGenerate" disabled>Generate</button>
+    <button class="btn-validate" onclick="runValidate()" id="btnValidate" disabled>Validate Only</button>
+    <button class="btn-discover" onclick="showDiscover()" id="btnDiscover" disabled>Discover</button>
+    <button class="btn-discover-fam" onclick="showDiscoverFam()" id="btnDiscoverFam" disabled>Discover by Family Count</button>
+    <button class="btn-reset" onclick="resetDefaults()">Reset to Defaults</button>
+  </div>
+
+  <!-- Log -->
+  <div class="log-section">
+    <div class="log-header">
+      <h2>Log</h2>
+      <span class="status status-loading" id="status">Loading...</span>
+    </div>
+    <div id="log">Initializing Python runtime (Pyodide)...
+This runs entirely in your browser — no server needed.
+</div>
+  </div>
+
+  <!-- Downloads -->
+  <div class="downloads" id="downloads">
+    <h2>Download MusicXML Files</h2>
+    <div id="downloadLinks"></div>
+  </div>
+
+  <div class="footer">
+    Zeitnetz Generator v2 &copy; 2026 Paulo de Assis &mdash;
+    <a href="https://github.com/MetamusicX/zeitnetz-generator" target="_blank">Source Code</a>
+  </div>
+</div>
+
+<!-- Discover Dialog -->
+<div class="discover-overlay" id="discoverOverlay">
+  <div class="discover-dialog">
+    <h3>Discovery Settings</h3>
+    <div class="field">
+      <label>Number of trials</label>
+      <input type="text" id="disc_trials" value="100">
+    </div>
+    <div class="field">
+      <label>Random seed (optional)</label>
+      <input type="text" id="disc_seed" value="42">
+    </div>
+    <div class="field">
+      <label>Minimum families</label>
+      <input type="text" id="disc_minfam" value="30">
+    </div>
+    <div class="dialog-buttons">
+      <button class="btn-reset" onclick="hideDiscover()">Cancel</button>
+      <button class="btn-discover" onclick="runDiscover()">Run Discovery</button>
+    </div>
+  </div>
+</div>
+
+<!-- Discover by Family Count Dialog -->
+<div class="discover-overlay" id="discoverFamOverlay">
+  <div class="discover-dialog fam-dialog">
+    <h3>Discover by Family Count</h3>
+    <div class="field">
+      <label>Target number of families</label>
+      <input type="text" id="discfam_target" value="52" placeholder="e.g. 52">
+      <div class="hint">Exact family count to search for</div>
+    </div>
+    <div class="field">
+      <label>Tolerance +/-</label>
+      <input type="text" id="discfam_tolerance" value="0" placeholder="0">
+      <div class="hint">e.g. +/-2 to find 50-54 when targeting 52</div>
+    </div>
+    <div class="field">
+      <label>Number of trials</label>
+      <input type="text" id="discfam_trials" value="500">
+    </div>
+    <div class="field">
+      <label>Random seed (optional)</label>
+      <input type="text" id="discfam_seed" value="">
+      <div class="hint">Leave empty for random</div>
+    </div>
+    <div class="dialog-buttons">
+      <button class="btn-reset" onclick="hideDiscoverFam()">Cancel</button>
+      <button class="btn-discover-fam" onclick="runDiscoverFam()">Run</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pyodide -->
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js"></script>
+<script>
+const DEFAULTS = {
+  pitches: "1 11 0 8 9 3 6 4 2 10 5 7",
+  perm: "1 5 0 6 2 7 11 8 3 10 4 9",
+  durations: "-11 6 9 7 6 6 4 3 10 6 3 1 10"
+};
+
+let pyodide = null;
+
+// -- Pyodide Initialization ------------------------------------------------
+
+async function initPyodide() {
+  const loadingText = document.getElementById('loadingText');
+
+  try {
+    loadingText.textContent = 'Loading Python runtime (~20 MB)...';
+    pyodide = await loadPyodide();
+
+    loadingText.textContent = 'Loading Zeitnetz engine v2...';
+
+    // Fetch the engine Python file
+    const resp = await fetch('zeitnetz_engine.py');
+    const engineCode = await resp.text();
+    await pyodide.runPythonAsync(engineCode);
+
+    // Hide loading overlay, enable buttons
+    document.getElementById('loadingOverlay').classList.remove('active');
+    setStatus('Ready', 'idle');
+    setButtons(false);
+    clearLog();
+    appendLog('Zeitnetz Generator v2 ready.\n\nDefault inputs: Lachenmann, Mouvement (- vor der Erstarrung)\n\nClick "Generate" to run the full pipeline,\n"Validate Only" to check inputs,\n"Discover" to find new viable combinations,\nor "Discover by Family Count" to target a specific number of families.\n');
+
+  } catch (e) {
+    loadingText.textContent = 'Error loading Python runtime!';
+    console.error(e);
+    setStatus('Error', 'error');
+    appendLog('\nFailed to initialize: ' + e.message + '\n');
+  }
+}
+
+// -- UI Helpers ------------------------------------------------------------
+
+function toggleCustomTS() {
+  const mode = document.querySelector('input[name="ts_mode"]:checked').value;
+  document.getElementById('ts_custom').disabled = (mode !== 'custom');
+}
+
+function toggleCustomTSTypes() {
+  const mode = document.querySelector('input[name="ts_types_mode"]:checked').value;
+  document.getElementById('ts_types_custom').disabled = (mode !== 'custom');
+}
+
+function resetDefaults() {
+  document.getElementById('pitches').value = DEFAULTS.pitches;
+  document.getElementById('perm').value = DEFAULTS.perm;
+  document.getElementById('durations').value = DEFAULTS.durations;
+  document.querySelector('input[name="ts_mode"][value="default"]').checked = true;
+  document.querySelector('input[name="ts_types_mode"][value="default"]').checked = true;
+  toggleCustomTS();
+  toggleCustomTSTypes();
+}
+
+function setStatus(text, cls) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status status-' + cls;
+}
+
+function setButtons(disabled) {
+  document.getElementById('btnGenerate').disabled = disabled;
+  document.getElementById('btnValidate').disabled = disabled;
+  document.getElementById('btnDiscover').disabled = disabled;
+  document.getElementById('btnDiscoverFam').disabled = disabled;
+}
+
+function clearLog() { document.getElementById('log').textContent = ''; }
+
+function appendLog(text) {
+  const el = document.getElementById('log');
+  el.textContent += text;
+  el.scrollTop = el.scrollHeight;
+}
+
+function hideDownloads() {
+  document.getElementById('downloads').classList.remove('visible');
+  document.getElementById('downloadLinks').innerHTML = '';
+}
+
+function showDownloadLinks(files) {
+  const container = document.getElementById('downloadLinks');
+  container.innerHTML = '';
+
+  for (const [filename, content] of Object.entries(files)) {
+    const blob = new Blob([content], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.className = 'download-link';
+    a.textContent = filename;
+    container.appendChild(a);
+  }
+
+  document.getElementById('downloads').classList.add('visible');
+}
+
+function getInputs() {
+  return {
+    pitches: document.getElementById('pitches').value,
+    perm: document.getElementById('perm').value,
+    durations: document.getElementById('durations').value,
+    ts_mode: document.querySelector('input[name="ts_mode"]:checked').value,
+    ts_custom: document.getElementById('ts_custom').value,
+    ts_types_mode: document.querySelector('input[name="ts_types_mode"]:checked').value,
+    ts_types_custom: document.getElementById('ts_types_custom').value,
+  };
+}
+
+function useResult(result) {
+  document.getElementById('pitches').value = result.pitch_row.join(' ');
+  document.getElementById('perm').value = result.perm_pattern.join(' ');
+  document.getElementById('durations').value = result.duration_list.join(' ');
+  hideDownloads();
+  appendLog('\n\nInputs updated. Click "Generate" to run.');
+}
+
+// -- API Calls -------------------------------------------------------------
+
+async function runGenerate() {
+  if (!pyodide) return;
+  clearLog();
+  hideDownloads();
+  setStatus('Running...', 'running');
+  setButtons(true);
+  appendLog('Running full pipeline...\n\n');
+
+  // Use setTimeout to let the UI update before blocking
+  await new Promise(r => setTimeout(r, 50));
+
+  try {
+    const inputs = getInputs();
+    const resultJson = await pyodide.runPythonAsync(`
+api_generate(
+    ${JSON.stringify(inputs.pitches)},
+    ${JSON.stringify(inputs.perm)},
+    ${JSON.stringify(inputs.durations)},
+    ${JSON.stringify(inputs.ts_mode)},
+    ${JSON.stringify(inputs.ts_custom)},
+    ${JSON.stringify(inputs.ts_types_mode)},
+    ${JSON.stringify(inputs.ts_types_custom)}
+)
+`);
+    const result = JSON.parse(resultJson);
+    clearLog();
+    appendLog(result.log);
+
+    if (!result.error && result.files && Object.keys(result.files).length > 0) {
+      showDownloadLinks(result.files);
+      setStatus('Done', 'done');
+    } else {
+      setStatus('Error', 'error');
+    }
+  } catch (e) {
+    appendLog('\nError: ' + e.message + '\n');
+    setStatus('Error', 'error');
+  } finally {
+    setButtons(false);
+  }
+}
+
+async function runValidate() {
+  if (!pyodide) return;
+  clearLog();
+  hideDownloads();
+  setStatus('Running...', 'running');
+  setButtons(true);
+  appendLog('Validating inputs...\n\n');
+
+  await new Promise(r => setTimeout(r, 50));
+
+  try {
+    const inputs = getInputs();
+    const resultJson = await pyodide.runPythonAsync(`
+api_validate(
+    ${JSON.stringify(inputs.pitches)},
+    ${JSON.stringify(inputs.perm)},
+    ${JSON.stringify(inputs.durations)}
+)
+`);
+    const result = JSON.parse(resultJson);
+    clearLog();
+    appendLog(result.log);
+    setStatus('Done', 'done');
+  } catch (e) {
+    appendLog('\nError: ' + e.message + '\n');
+    setStatus('Error', 'error');
+  } finally {
+    setButtons(false);
+  }
+}
+
+function showDiscover() {
+  document.getElementById('discoverOverlay').classList.add('active');
+}
+
+function hideDiscover() {
+  document.getElementById('discoverOverlay').classList.remove('active');
+}
+
+function showDiscoverFam() {
+  document.getElementById('discoverFamOverlay').classList.add('active');
+}
+
+function hideDiscoverFam() {
+  document.getElementById('discoverFamOverlay').classList.remove('active');
+}
+
+async function runDiscover() {
+  hideDiscover();
+  if (!pyodide) return;
+  clearLog();
+  hideDownloads();
+  setStatus('Running...', 'running');
+  setButtons(true);
+  appendLog('Running discovery (this may take a moment)...\n\n');
+
+  await new Promise(r => setTimeout(r, 50));
+
+  try {
+    const trials = parseInt(document.getElementById('disc_trials').value) || 100;
+    const seed = document.getElementById('disc_seed').value.trim();
+    const minFam = parseInt(document.getElementById('disc_minfam').value) || 30;
+
+    const resultJson = await pyodide.runPythonAsync(`
+api_discover(
+    trials=${trials},
+    seed=${seed || 'None'},
+    min_families=${minFam}
+)
+`);
+    const result = JSON.parse(resultJson);
+    clearLog();
+    appendLog(result.log);
+
+    // If results found, offer to use the best one
+    if (result.results && result.results.length > 0) {
+      const best = result.results[0];
+      appendLog('\n\n--- To use the best result, click "Use Best" below ---');
+
+      const container = document.getElementById('downloadLinks');
+      container.innerHTML = '';
+      const btn = document.createElement('button');
+      btn.className = 'btn-generate';
+      btn.textContent = `Use Best (${best.n_families} families)`;
+      btn.onclick = () => { useResult(best); };
+      container.appendChild(btn);
+      document.getElementById('downloads').classList.add('visible');
+    }
+
+    setStatus('Done', 'done');
+  } catch (e) {
+    appendLog('\nError: ' + e.message + '\n');
+    setStatus('Error', 'error');
+  } finally {
+    setButtons(false);
+  }
+}
+
+async function runDiscoverFam() {
+  hideDiscoverFam();
+  if (!pyodide) return;
+  clearLog();
+  hideDownloads();
+  setStatus('Running...', 'running');
+  setButtons(true);
+
+  const target = parseInt(document.getElementById('discfam_target').value);
+  if (!target || target < 1) {
+    appendLog('ERROR: Please enter a valid target number of families.\n');
+    setStatus('Error', 'error');
+    setButtons(false);
+    return;
+  }
+
+  const tolerance = parseInt(document.getElementById('discfam_tolerance').value) || 0;
+  const trials = parseInt(document.getElementById('discfam_trials').value) || 500;
+  const seedStr = document.getElementById('discfam_seed').value.trim();
+
+  appendLog(`Searching for combinations with ${target} families (+/- ${tolerance})...\n`);
+  appendLog(`Trials: ${trials}\n\n`);
+
+  await new Promise(r => setTimeout(r, 50));
+
+  try {
+    const resultJson = await pyodide.runPythonAsync(`
+api_discover_by_families(
+    target_families=${target},
+    tolerance=${tolerance},
+    trials=${trials},
+    seed=${seedStr || 'None'}
+)
+`);
+    const result = JSON.parse(resultJson);
+    clearLog();
+    appendLog(result.log);
+
+    // Show "Use" buttons for each result
+    if (result.results && result.results.length > 0) {
+      appendLog('\n\n--- Click a "Use" button below to load a result ---');
+
+      const container = document.getElementById('downloadLinks');
+      container.innerHTML = '';
+
+      const maxShow = Math.min(result.results.length, 10);
+      for (let i = 0; i < maxShow; i++) {
+        const r = result.results[i];
+        const btn = document.createElement('button');
+        btn.className = 'result-use-btn';
+        btn.style.display = 'inline-block';
+        btn.style.margin = '4px 6px';
+        btn.style.padding = '8px 16px';
+        btn.style.fontSize = '13px';
+        const distLabel = r.distance > 0 ? ` (off by ${r.distance})` : '';
+        btn.textContent = `Use #${i+1}: ${r.n_families} fam${distLabel}`;
+        btn.onclick = () => { useResult(r); };
+        container.appendChild(btn);
+      }
+      document.getElementById('downloads').classList.add('visible');
+    }
+
+    setStatus('Done', 'done');
+  } catch (e) {
+    appendLog('\nError: ' + e.message + '\n');
+    setStatus('Error', 'error');
+  } finally {
+    setButtons(false);
+  }
+}
+
+// -- Initialize ------------------------------------------------------------
+
+initPyodide();
+</script>
+</body>
+</html>
