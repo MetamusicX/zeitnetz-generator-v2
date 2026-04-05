@@ -2,7 +2,7 @@
 
 **Extended Edition — Custom Family Count Discovery and Custom Time Signatures**
 
-An algorithmic time-grid generator for music composition, based on the serial procedures underlying Helmut Lachenmann's *Mouvement (– vor der Erstarrung)* (1982–84). This tool reconstructs and generalises the complete Zeitnetz (time-net) generation process as analysed by Luís Antunes Pena (2004).
+An algorithmic time-grid generator for music composition, based on the serial procedures underlying Helmut Lachenmann's *Mouvement (– vor der Erstarrung)* (1982–84). This tool reconstructs and generalises the complete Zeitnetz (time-net) generation process as analysed by Pietro Cavalotti (2004) and Luís Antunes Pena (2004).
 
 **Live app:** [lachenmann-machine-v2.netlify.app](https://lachenmann-machine-v2.netlify.app)
 
