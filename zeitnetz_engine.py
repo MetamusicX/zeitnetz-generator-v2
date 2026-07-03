@@ -502,7 +502,9 @@ def run_stage2(s1):
         start = 1 + k * 12
         durs = flat[start: start + 12]
         if len(durs) < 12:
-            target_pc = pitch_targets[(k * 12 + len(durs)) % tape_len]
+            # flat[i] scans for pitch_targets[i]; the missing value is
+            # flat[1 + k*12 + len(durs)], which wraps to target index 0.
+            target_pc = pitch_targets[(1 + k * 12 + len(durs)) % tape_len]
             count = 0
             scan = cursor
             while True:
